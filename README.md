@@ -1,2 +1,2 @@
-# markd
-Markdown blog tool used to generate static sites
+# mkd
+Opinionated markdown based static site generator written in golang
