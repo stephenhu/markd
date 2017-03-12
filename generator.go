@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"html"
 	"html/template"
   "io/ioutil"
 	"os"
@@ -17,8 +16,11 @@ const (
 
 	LAYOUT 			= "layout.amber"
 	ARTICLE     = "article.amber"
+	INDEX       = "index.amber"
   AMBER       = ".amber"
 	MD          = ".md"
+	README      = "README.md"
+	INDEXHTML   = "index.html"
 
 )
 
@@ -27,6 +29,10 @@ type Article struct {
 	Summary		template.HTML
 	Title     string
 	URL				string
+}
+
+type Index struct {
+	Articles  []Article
 }
 
 var compiler = amber.New()
@@ -60,13 +66,16 @@ func readFiles() {
 	for _, f := range files {
 
     filename := f.Name()
-		if strings.Contains(filename, MD) && filename[0] != '.' {
+		if strings.Contains(filename, MD) && filename[0] != '.' &&
+		  filename != README {
 
 		  compile(filename)
 
 		}
 
 	}
+
+	compileIndex(files)
 
 } // readFiles
 
@@ -97,10 +106,6 @@ func mdArticle(filename string) *Article {
   
 	name := strings.TrimRight(filename, MD)
 
-  color.Magenta(html.EscapeString(string(md))[0:20])
-	color.Magenta(html.UnescapeString(string(md))[0:20])
-	color.Magenta(string(md)[0:20])
-
 	article.Summary = template.HTML(string(md))
   article.Date		= f.ModTime().String()
 	article.Title   = strings.Title(name)
@@ -113,7 +118,7 @@ func mdArticle(filename string) *Article {
 
 func compile(filename string) {
 
-  color.Cyan("+ Generating html for %s", filename)
+  color.Cyan("[Compiling %s]", filename)
 
 	parseErr := compiler.ParseFile(ARTICLE)
 
@@ -145,12 +150,11 @@ func compile(filename string) {
 
 		if tmplErr != nil {
 
-			color.Red("[ERROR] %s", tmplErr.Error())
+			color.Red("[Error] %s", tmplErr.Error())
 			os.Exit(1)
 
 		}
 
-		color.Yellow(article.Date)
 		tmpl.Execute(f, article)
 		
 	} else {
@@ -159,6 +163,66 @@ func compile(filename string) {
 
 } // compile
 
-func compileIndex() {
+func compileIndex(files []os.FileInfo) {
+
+  color.Cyan("[Compiling index file]")
+
+  index := Index{}
+
+  articles := []Article{}
+
+  for _, f := range files {
+
+    filename := f.Name()
+
+    if strings.Contains(filename, MD) && filename[0] != '.' &&
+		  filename != README {
+
+		  article := mdArticle(filename)
+
+			articles = append(articles, *article)
+		
+		}
+
+	}
+
+	parseErr := compiler.ParseFile(INDEX)
+
+	if parseErr != nil {
+
+		fmt.Println("[Error] %s", parseErr.Error())
+		return
+	
+	}
+
+	_, statErr := os.Stat(INDEXHTML)
+
+	if statErr != nil {
+
+    f, createErr := os.Create(INDEXHTML)
+
+		if createErr != nil {
+
+			color.Red("[Error] %s", createErr.Error())
+		  return
+
+		}
+
+		defer f.Close()
+
+    tmpl, tmplErr := compiler.Compile()
+
+		if tmplErr != nil {
+
+			color.Red("[Error] %s", tmplErr.Error())
+			os.Exit(1)
+
+		}
+
+		index.Articles = articles
+
+		tmpl.Execute(f, index)
+
+	}
 
 } // compileIndex
